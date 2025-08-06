@@ -11,7 +11,7 @@ import { downloadExecutable, downloadToTempFile, checkForUpdatesAndUpdate } from
 import { Youtube } from './utils/youtube.js';
 import { TwitchStream } from './@types/index.js';
 import { parseTimeString, formatTimeString } from './utils/timeParser.js';
-import { getOptimizedStreamOptions, getStreamOptionsForVideo, getEmergencyStreamOptions, getAudioOptimizedStreamOptions, getOptimizedFfmpegInput } from './utils/streamOptimizer.js';
+import { getOptimizedStreamOptions, getStreamOptionsForVideo, getEmergencyStreamOptions, getAudioOptimizedStreamOptions } from './utils/streamOptimizer.js';
 
 // Download yt-dlp and check for updates
 (async () => {
@@ -641,28 +641,22 @@ async function playVideo(message: Message, videoSource: string, title?: string, 
             minimizeLatency: optimizedStreamOpts.minimizeLatency
         });
 
-        // Add seeking support to ffmpeg input
-        let ffmpegInput = inputForFfmpeg;
-        
+        // Handle seeking for local files and downloaded videos
         if (seekTime > 0) {
             // For local files and downloaded videos, we can seek directly
             if (typeof inputForFfmpeg === 'string' && (inputForFfmpeg.endsWith('.mp4') || inputForFfmpeg.endsWith('.mkv') || inputForFfmpeg.endsWith('.avi') || inputForFfmpeg.endsWith('.mov'))) {
-                // Use the optimized FFmpeg input function that handles seeking properly
-                ffmpegInput = getOptimizedFfmpegInput(inputForFfmpeg, seekTime);
-                logger.info(`Using optimized FFmpeg input with seeking: ${ffmpegInput}`);
+                logger.info(`Seeking to ${seekTime} seconds for local file: ${inputForFfmpeg}`);
+                // Add seeking flag to the stream options
+                optimizedStreamOpts.customFfmpegFlags = [`-ss ${seekTime}`];
             } else {
                 // For URLs and other sources, we need to handle seeking differently
-                // This is a simplified approach - you might need more sophisticated handling
                 logger.info(`Seeking not fully supported for this video source type. Starting from beginning.`);
             }
-        } else {
-            // Use optimized input without seeking
-            ffmpegInput = getOptimizedFfmpegInput(inputForFfmpeg, 0);
         }
 
-        logger.info(`ffmpegInput: ${ffmpegInput}`);
+        logger.info(`Using input file: ${inputForFfmpeg}`);
 
-        const { command, output: ffmpegOutput } = prepareStream(ffmpegInput, optimizedStreamOpts, controller.signal);
+        const { command, output: ffmpegOutput } = prepareStream(inputForFfmpeg, optimizedStreamOpts, controller.signal);
 
         command.on("error", (err, stdout, stderr) => {
             logger.error("An error happened with ffmpeg:", err.message);
@@ -678,6 +672,13 @@ async function playVideo(message: Message, videoSource: string, title?: string, 
         // Start tracking playback time
         playbackStartTime = Date.now();
         isPlaybackActive = true;
+        
+        // If we're seeking, adjust the playback start time to account for the seek
+        if (seekTime > 0) {
+            // Adjust the start time to account for the seek position
+            // This ensures the time tracking starts from the seek position, not from 0
+            playbackStartTime = Date.now() - (seekTime * 1000);
+        }
         
         await playStream(ffmpegOutput, streamer, undefined, controller.signal)
             .catch((err) => {

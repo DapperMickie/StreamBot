@@ -22,6 +22,7 @@ export function getOptimizedStreamOptions() {
         keyframeInterval: 1, // Very frequent keyframes for better seeking
         bufferSize: 8192, // Much larger buffer for smoother playback
         maxMuxingQueueSize: 2048, // Increased muxing queue size
+        customFfmpegFlags: [], // Custom FFmpeg flags for seeking and other options
     };
 }
 
@@ -160,6 +161,7 @@ export function getAudioOptimizedStreamOptions() {
         keyframeInterval: 1,
         bufferSize: 32768, // Very large buffer
         maxMuxingQueueSize: 512, // Small muxing queue
+        customFfmpegFlags: [], // Custom FFmpeg flags
     };
 }
 
@@ -183,5 +185,6 @@ export function getEmergencyStreamOptions() {
         keyframeInterval: 1,
         bufferSize: 16384, // Very large buffer
         maxMuxingQueueSize: 4096,
+        customFfmpegFlags: [], // Custom FFmpeg flags
     };
 } 
