@@ -660,6 +660,8 @@ async function playVideo(message: Message, videoSource: string, title?: string, 
             ffmpegInput = getOptimizedFfmpegInput(inputForFfmpeg, 0);
         }
 
+        logger.info(`ffmpegInput: ${ffmpegInput}`);
+
         const { command, output: ffmpegOutput } = prepareStream(ffmpegInput, optimizedStreamOpts, controller.signal);
 
         command.on("error", (err, stdout, stderr) => {
