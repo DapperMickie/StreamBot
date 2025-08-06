@@ -434,11 +434,44 @@ streamer.client.on('messageCreate', async (message) => {
                         return;
                     }
 
-                    if (currentSeekTime > 0) {
-                        await sendInfo(message, 'Current Position', `Playing at ${formatTimeString(currentSeekTime)}`);
+                    // Calculate current playback time
+                    let currentPlaybackTime = currentSeekTime;
+                    
+                    if (isPlaybackActive && playbackStartTime > 0) {
+                        // Calculate elapsed time since playback started
+                        const elapsedSeconds = Math.floor((Date.now() - playbackStartTime) / 1000);
+                        currentPlaybackTime = currentSeekTime + elapsedSeconds;
+                    }
+
+                    if (currentPlaybackTime > 0) {
+                        await sendInfo(message, 'Current Position', `Playing at ${formatTimeString(currentPlaybackTime)}`);
                     } else {
                         await sendInfo(message, 'Current Position', 'Playing from beginning');
                     }
+                }
+                break;
+            case 'time':
+                {
+                    if (!streamStatus.playing) {
+                        await sendError(message, 'No video is currently playing');
+                        return;
+                    }
+
+                    // Calculate current playback time
+                    let currentPlaybackTime = currentSeekTime;
+                    
+                    if (isPlaybackActive && playbackStartTime > 0) {
+                        // Calculate elapsed time since playback started
+                        const elapsedSeconds = Math.floor((Date.now() - playbackStartTime) / 1000);
+                        currentPlaybackTime = currentSeekTime + elapsedSeconds;
+                    }
+                    
+                    const timeString = formatTimeString(currentPlaybackTime);
+                    
+                    await sendInfo(message, 'Current Time', 
+                        `⏰ **${timeString}**\n\n` +
+                        `Use \`${config.prefix}scrub ${timeString}\` to resume from this position later.`
+                    );
                 }
                 break;
             case 'quality':
@@ -485,6 +518,7 @@ streamer.client.on('messageCreate', async (message) => {
                         `\`${config.prefix}stop\` - Stop playback`,
                         `\`${config.prefix}scrub <time>\` - Jump to time (HH:MM:SS, HH:MM, or SS)`,
                         `\`${config.prefix}position\` - Show current playback position`,
+                        `\`${config.prefix}time\` - Show current time for resuming later`,
                         `\`${config.prefix}quality <low/medium/high/emergency/audio>\` - Set streaming quality`,
                         '',
                         '🛠️ **Utils**',
@@ -517,6 +551,8 @@ streamer.client.on('messageCreate', async (message) => {
 let currentVideoSource: string | null = null;
 let currentVideoTitle: string | null = null;
 let currentSeekTime: number = 0;
+let playbackStartTime: number = 0;
+let isPlaybackActive: boolean = false;
 
 // Function to play video
 async function playVideo(message: Message, videoSource: string, title?: string, seekTime: number = 0) {
@@ -637,6 +673,10 @@ async function playVideo(message: Message, videoSource: string, title?: string, 
             logger.info(`ffmpeg processing finished successfully for ${title || videoSource}.`);
         });
 
+        // Start tracking playback time
+        playbackStartTime = Date.now();
+        isPlaybackActive = true;
+        
         await playStream(ffmpegOutput, streamer, undefined, controller.signal)
             .catch((err) => {
                 if (!controller.signal.aborted) {
@@ -694,6 +734,10 @@ async function cleanupStreamStatus() {
             channelId: "",
             cmdChannelId: "",
         };
+        
+        // Stop tracking playback
+        isPlaybackActive = false;
+        playbackStartTime = 0;
     } catch (error) {
         logger.error("Error during cleanup:", error);
     }
