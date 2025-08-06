@@ -11,7 +11,7 @@ import { downloadExecutable, downloadToTempFile, checkForUpdatesAndUpdate } from
 import { Youtube } from './utils/youtube.js';
 import { TwitchStream } from './@types/index.js';
 import { parseTimeString, formatTimeString } from './utils/timeParser.js';
-import { getOptimizedStreamOptions, getStreamOptionsForVideo } from './utils/streamOptimizer.js';
+import { getOptimizedStreamOptions, getStreamOptionsForVideo, getEmergencyStreamOptions } from './utils/streamOptimizer.js';
 
 // Download yt-dlp and check for updates
 (async () => {
@@ -449,16 +449,17 @@ streamer.client.on('messageCreate', async (message) => {
                     }
 
                     const qualityArg = args.shift()?.toLowerCase();
-                    if (!qualityArg || !['low', 'medium', 'high'].includes(qualityArg)) {
-                        await sendError(message, 'Please specify quality: low, medium, or high');
+                    if (!qualityArg || !['low', 'medium', 'high', 'emergency'].includes(qualityArg)) {
+                        await sendError(message, 'Please specify quality: low, medium, high, or emergency');
                         return;
                     }
 
                     // Quality presets
                     const qualityPresets = {
-                        low: { frameRate: 24, bitrateVideo: 1000, minimizeLatency: true },
-                        medium: { frameRate: 30, bitrateVideo: 1500, minimizeLatency: true },
-                        high: { frameRate: 30, bitrateVideo: 2000, minimizeLatency: false }
+                        low: { frameRate: 20, bitrateVideo: 800, minimizeLatency: true },
+                        medium: { frameRate: 24, bitrateVideo: 1200, minimizeLatency: true },
+                        high: { frameRate: 24, bitrateVideo: 1500, minimizeLatency: true },
+                        emergency: getEmergencyStreamOptions()
                     };
 
                     const preset = qualityPresets[qualityArg as keyof typeof qualityPresets];
@@ -483,7 +484,7 @@ streamer.client.on('messageCreate', async (message) => {
                         `\`${config.prefix}stop\` - Stop playback`,
                         `\`${config.prefix}scrub <time>\` - Jump to time (HH:MM:SS, HH:MM, or SS)`,
                         `\`${config.prefix}position\` - Show current playback position`,
-                        `\`${config.prefix}quality <low/medium/high>\` - Set streaming quality`,
+                        `\`${config.prefix}quality <low/medium/high/emergency>\` - Set streaming quality`,
                         '',
                         '🛠️ **Utils**',
                         `\`${config.prefix}list\` - Show local videos`,

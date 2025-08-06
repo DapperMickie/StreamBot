@@ -1,166 +1,227 @@
 # Troubleshooting Stuttering Issues
 
-## Common Causes of Stuttering
+## Overview
+This guide helps resolve video stuttering issues in StreamBot. Stuttering can be caused by various factors including system performance, network conditions, and video encoding settings.
 
-### 1. **High Bitrate/Frame Rate**
-- **Problem**: Your system can't handle the current streaming settings
-- **Solution**: Use the quality command to lower settings
-  ```
-  !quality low    # For minimal stuttering
-  !quality medium # For balanced performance
-  ```
+## Quick Fixes
+
+### 1. Use Emergency Mode
+If you're experiencing severe stuttering (frame timing warnings > 1000%), try emergency mode:
+```
+!quality emergency
+```
+This uses ultra-low settings:
+- 854x480 resolution
+- 15 FPS
+- 500 kbps video bitrate
+- 64 kbps audio bitrate
+- Mono audio
+
+### 2. Try Lower Quality Settings
+```
+!quality low    # 20 FPS, 800 kbps
+!quality medium # 24 FPS, 1200 kbps
+!quality high   # 24 FPS, 1500 kbps
+```
+
+## Common Causes
+
+### 1. **System Performance Issues**
+- **CPU overload**: Video encoding is CPU-intensive
+- **Insufficient RAM**: Large video files need memory
+- **Slow storage**: Reading from slow drives causes buffering
 
 ### 2. **Network Issues**
-- **Problem**: Slow or unstable internet connection
-- **Solutions**:
-  - Check your internet speed
-  - Use wired connection instead of WiFi
-  - Close other bandwidth-heavy applications
-  - Try lower quality settings
+- **Bandwidth limitations**: High bitrate videos need good internet
+- **Latency**: High ping affects real-time streaming
+- **Packet loss**: Network instability causes frame drops
 
-### 3. **System Resources**
-- **Problem**: CPU/GPU can't handle video processing
-- **Solutions**:
-  - Close other applications
-  - Check CPU/GPU usage during streaming
-  - Use hardware acceleration if available
-  - Lower quality settings
+### 3. **Video Source Issues**
+- **Variable frame rates**: YouTube videos often have inconsistent FPS
+- **High bitrate sources**: Some videos are too high quality
+- **Corrupted frames**: Damaged video files cause stuttering
 
-### 4. **Video Source Issues**
-- **Problem**: Some video sources are harder to process
-- **Solutions**:
-  - YouTube videos: Use `!quality low` or `!quality medium`
-  - Twitch streams: Use `!quality medium`
-  - Local files: Usually work best with `!quality high`
+### 4. **Discord Limitations**
+- **Voice channel limits**: Discord has bandwidth restrictions
+- **Server location**: Distance to Discord servers affects performance
+- **Bot rate limits**: Too many requests can cause issues
 
 ## Performance Commands
 
 ### Quality Settings
 ```
-!quality low     # 24fps, 1000kbps - Minimal stuttering
-!quality medium  # 30fps, 1500kbps - Balanced performance  
-!quality high    # 30fps, 2000kbps - High quality (may stutter)
+!quality low      # Minimal stuttering, lower quality
+!quality medium   # Balanced performance
+!quality high     # Better quality, may stutter
+!quality emergency # Ultra-low settings for severe issues
 ```
 
-### Position Tracking
+### Monitoring
 ```
-!position        # Check current playback position
-!scrub <time>    # Jump to specific time
+!status           # Check current stream status
+!position         # Show current playback position
 ```
 
 ## Optimized Settings by Video Type
 
 ### YouTube Videos
-- **Recommended**: `!quality low` or `!quality medium`
+- **Frame Rate**: 20 FPS (reduced from 24)
+- **Bitrate**: 800 kbps (very conservative)
 - **Reason**: YouTube videos often have variable frame rates
-- **Settings**: 24fps, 1500kbps, latency minimization enabled
 
 ### Twitch Streams
-- **Recommended**: `!quality medium`
-- **Reason**: Optimized for live content
-- **Settings**: 30fps, 1800kbps, latency minimization enabled
+- **Frame Rate**: 24 FPS
+- **Bitrate**: 1000 kbps
+- **Reason**: Live content needs consistent performance
 
 ### Local Files
-- **Recommended**: `!quality high`
-- **Reason**: Local files can handle higher quality
-- **Settings**: 30fps, 2000kbps, latency minimization disabled
+- **Frame Rate**: 24 FPS
+- **Bitrate**: 1200 kbps
+- **Reason**: Local files can handle slightly higher quality
 
 ## Technical Optimizations Applied
 
 ### FFmpeg Settings
-- **Preset**: `veryfast` for better performance
-- **Tune**: `zerolatency` for reduced latency
-- **Profile**: `baseline` for compatibility
-- **B-frames**: Disabled for lower latency
-- **Reference frames**: Limited to 1
+- **Preset**: `ultrafast` (fastest encoding)
+- **Tune**: `zerolatency` (minimize latency)
+- **Profile**: `baseline` (maximum compatibility)
+- **GOP Size**: 30 frames (smaller for better seeking)
+- **B-frames**: Disabled (reduces latency)
+- **Reference frames**: 1 (minimal memory usage)
 
-### Buffering
-- **Buffer size**: Increased to 4096
-- **Muxing queue**: Increased to 1024
-- **Analyze duration**: Increased to 10M
-- **Probe size**: Increased to 10M
+### Buffering Settings
+- **Buffer Size**: 8192 (increased for smoother playback)
+- **Muxing Queue**: 2048 (larger queue for stability)
+- **Thread Queue**: 512 (better thread management)
 
-### Latency Reduction
-- **Minimize latency**: Enabled for online sources
-- **Mux delay**: Reduced to 0.1s
-- **Mux preload**: Reduced to 0.1s
-- **Flush packets**: Enabled
+### Audio Optimizations
+- **Bitrate**: 96 kbps (reduced for performance)
+- **Sample Rate**: 48 kHz (standard)
+- **Channels**: Stereo (emergency mode uses mono)
 
 ## System Requirements
 
 ### Minimum Requirements
-- **CPU**: 4 cores, 2.5GHz+
-- **RAM**: 8GB+
-- **Network**: 10Mbps+ upload
+- **CPU**: 4-core processor (2.0 GHz+)
+- **RAM**: 4 GB available
 - **Storage**: SSD recommended
+- **Network**: 5 Mbps upload speed
 
 ### Recommended Requirements
-- **CPU**: 8 cores, 3.0GHz+
-- **RAM**: 16GB+
-- **Network**: 50Mbps+ upload
+- **CPU**: 6-core processor (3.0 GHz+)
+- **RAM**: 8 GB available
 - **Storage**: NVMe SSD
-- **GPU**: Hardware acceleration supported
+- **Network**: 10+ Mbps upload speed
 
 ## Troubleshooting Steps
 
-### Step 1: Check Current Quality
-```
-!quality medium  # Start with medium quality
-```
+### Step 1: Check System Resources
+1. Monitor CPU usage during streaming
+2. Check available RAM
+3. Monitor network upload speed
+4. Check disk I/O performance
 
-### Step 2: Monitor Performance
-- Watch for stuttering patterns
-- Check system resource usage
-- Monitor network stability
-
-### Step 3: Adjust Settings
+### Step 2: Try Emergency Mode
 ```
-!quality low     # If still stuttering
-!quality high    # If system can handle more
+!quality emergency
 ```
+If this fixes the stuttering, your system needs lower settings.
 
-### Step 4: Check Video Source
-- Try different video sources
-- Test with local files first
-- Avoid very long videos initially
+### Step 3: Check Video Source
+1. Try different videos to isolate the issue
+2. Test with local files vs. online sources
+3. Check if specific video types cause more stuttering
+
+### Step 4: Network Diagnostics
+1. Test upload speed: https://www.speedtest.net
+2. Check ping to Discord servers
+3. Try different network connections
 
 ### Step 5: System Optimization
-- Close unnecessary applications
-- Use wired internet connection
-- Ensure adequate cooling
-- Check for background processes
+1. Close unnecessary applications
+2. Disable background processes
+3. Update graphics drivers
+4. Check for system updates
 
-## Advanced Troubleshooting
+## Advanced Solutions
 
-### Enable Debug Logging
-Check the console output for:
-- FFmpeg errors
-- Network timeouts
-- Resource usage warnings
+### 1. Hardware Acceleration
+Enable hardware acceleration in your config:
+```javascript
+hardwareAcceleratedDecoding: true
+```
 
-### Network Diagnostics
-- Test upload speed: https://www.speedtest.net
-- Check for packet loss
-- Verify Discord server location
+### 2. Custom FFmpeg Filters
+Add performance filters to reduce processing:
+```javascript
+// In streamOptimizer.ts
+'fps=fps=20', // Force lower frame rate
+'scale=1280:720:flags=fast_bilinear', // Fast scaling
+```
 
-### System Monitoring
-- Monitor CPU usage during streaming
-- Check memory usage
-- Watch for thermal throttling
+### 3. Buffer Optimization
+Increase buffer sizes for smoother playback:
+```javascript
+bufferSize: 16384, // Very large buffer
+maxMuxingQueueSize: 4096, // Large queue
+```
 
-## Still Having Issues?
+## Emergency Mode Details
 
-1. **Try different video sources** - Some videos are harder to process
-2. **Use lower quality settings** - Start with `!quality low`
-3. **Check your internet** - Upload speed is crucial
-4. **Restart the bot** - Sometimes helps with resource issues
-5. **Update dependencies** - Ensure latest versions of FFmpeg and other tools
+When you use `!quality emergency`, the bot applies these ultra-conservative settings:
 
-## Performance Tips
+### Video Settings
+- **Resolution**: 854x480 (reduced from 1280x720)
+- **Frame Rate**: 15 FPS (very low)
+- **Bitrate**: 500 kbps (very low)
+- **Max Bitrate**: 800 kbps
 
-- **Start with low quality** and work your way up
-- **Use wired internet** instead of WiFi
-- **Close other applications** during streaming
-- **Monitor system resources** while streaming
-- **Test with shorter videos** first
-- **Use local files** for best performance 
+### Audio Settings
+- **Bitrate**: 64 kbps (very low)
+- **Channels**: Mono (instead of stereo)
+- **Sample Rate**: 48 kHz
+
+### Performance Settings
+- **Buffer Size**: 16384 (very large)
+- **Muxing Queue**: 4096 (very large)
+- **Threads**: Limited to 2 (reduces CPU usage)
+
+## Monitoring Performance
+
+### Console Warnings to Watch For
+```
+WARN stream:video:send Frame takes too long to send (>100% frametime)
+WARN stream:audio:send Frame takes too long to send (>100% frametime)
+```
+
+### Acceptable Performance
+- **Frame timing**: < 50% of expected frametime
+- **Audio timing**: < 100% of expected frametime
+- **No dropped frames**: Consistent frame delivery
+
+### Poor Performance Indicators
+- **Frame timing**: > 200% of expected frametime
+- **Audio timing**: > 500% of expected frametime
+- **Frequent warnings**: Multiple warnings per second
+
+## Getting Help
+
+If stuttering persists after trying all solutions:
+
+1. **Check the logs** for specific error messages
+2. **Try emergency mode** to see if it's a performance issue
+3. **Test with different videos** to isolate the problem
+4. **Monitor system resources** during streaming
+5. **Check network stability** and upload speeds
+
+## Recent Optimizations
+
+### Version 2.0 Changes
+- **Reduced default frame rates** from 30 to 24 FPS
+- **Lowered bitrates** across all quality levels
+- **Added emergency mode** for severe stuttering
+- **Improved buffering** with larger buffer sizes
+- **Optimized FFmpeg settings** for better performance
+- **Enhanced error handling** for corrupt frames
+
+These changes should significantly reduce stuttering issues while maintaining acceptable video quality. 
