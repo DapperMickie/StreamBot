@@ -10,6 +10,8 @@ import logger from './utils/logger.js';
 import { downloadExecutable, downloadToTempFile, checkForUpdatesAndUpdate } from './utils/yt-dlp.js';
 import { Youtube } from './utils/youtube.js';
 import { TwitchStream } from './@types/index.js';
+import { parseTimeString, formatTimeString } from './utils/timeParser.js';
+import { getOptimizedStreamOptions, getStreamOptionsForVideo } from './utils/streamOptimizer.js';
 
 // Download yt-dlp and check for updates
 (async () => {
@@ -30,17 +32,8 @@ let controller: AbortController;
 // Create a new instance of Youtube
 const youtube = new Youtube();
 
-const streamOpts = {
-    width: config.width,
-    height: config.height,
-    frameRate: config.fps,
-    bitrateVideo: config.bitrateKbps,
-    bitrateVideoMax: config.maxBitrateKbps,
-    videoCodec: Utils.normalizeVideoCodec(config.videoCodec),
-    hardwareAcceleratedDecoding: config.hardwareAcceleratedDecoding,
-    minimizeLatency: false,
-    h26xPreset: config.h26xPreset
-};
+// Use optimized stream options to reduce stuttering
+const streamOpts = getOptimizedStreamOptions();
 
 // Create the videosFolder dir if it doesn't exist
 if (!fs.existsSync(config.videosDir)) {
@@ -390,6 +383,93 @@ streamer.client.on('messageCreate', async (message) => {
                     }
                 }
                 break;
+            case 'scrub':
+                {
+                    if (!streamStatus.playing) {
+                        await sendError(message, 'No video is currently playing');
+                        return;
+                    }
+
+                    const timeArg = args.shift();
+                    if (!timeArg) {
+                        await sendError(message, 'Please provide a time. Format: HH:MM:SS, HH:MM, or SS');
+                        return;
+                    }
+
+                    try {
+                        const targetTime = parseTimeString(timeArg);
+                        
+                        // Send confirmation message
+                        await sendSuccess(message, `Seeking to ${formatTimeString(targetTime)}`);
+                        
+                        // Abort current stream
+                        controller?.abort();
+                        
+                        // Restart video from new position if we have current video info
+                        if (currentVideoSource && currentVideoTitle) {
+                            logger.info(`Seeking to ${targetTime} seconds for ${currentVideoTitle}`);
+                            
+                            // Small delay to ensure current stream is fully stopped
+                            setTimeout(async () => {
+                                try {
+                                    await playVideo(message, currentVideoSource!, currentVideoTitle!, targetTime);
+                                } catch (error) {
+                                    logger.error('Error during scrubbing:', error);
+                                    await sendError(message, 'Failed to seek to specified time');
+                                }
+                            }, 1000);
+                        } else {
+                            await sendError(message, 'No video information available for scrubbing');
+                        }
+                        
+                    } catch (error) {
+                        await sendError(message, `Invalid time format: ${timeArg}. Use HH:MM:SS, HH:MM, or SS`);
+                    }
+                }
+                break;
+            case 'position':
+                {
+                    if (!streamStatus.playing) {
+                        await sendError(message, 'No video is currently playing');
+                        return;
+                    }
+
+                    if (currentSeekTime > 0) {
+                        await sendInfo(message, 'Current Position', `Playing at ${formatTimeString(currentSeekTime)}`);
+                    } else {
+                        await sendInfo(message, 'Current Position', 'Playing from beginning');
+                    }
+                }
+                break;
+            case 'quality':
+                {
+                    if (!streamStatus.playing) {
+                        await sendError(message, 'No video is currently playing');
+                        return;
+                    }
+
+                    const qualityArg = args.shift()?.toLowerCase();
+                    if (!qualityArg || !['low', 'medium', 'high'].includes(qualityArg)) {
+                        await sendError(message, 'Please specify quality: low, medium, or high');
+                        return;
+                    }
+
+                    // Quality presets
+                    const qualityPresets = {
+                        low: { frameRate: 24, bitrateVideo: 1000, minimizeLatency: true },
+                        medium: { frameRate: 30, bitrateVideo: 1500, minimizeLatency: true },
+                        high: { frameRate: 30, bitrateVideo: 2000, minimizeLatency: false }
+                    };
+
+                    const preset = qualityPresets[qualityArg as keyof typeof qualityPresets];
+                    
+                    // Update global stream options
+                    Object.assign(streamOpts, preset);
+                    
+                    await sendSuccess(message, `Quality set to ${qualityArg}. Changes will apply to next video.`);
+                    logger.info(`Stream quality changed to ${qualityArg}:`, preset);
+                }
+                break;
             case 'help':
                 {
                     // Help text
@@ -401,6 +481,9 @@ streamer.client.on('messageCreate', async (message) => {
                         `\`${config.prefix}playlink\` - Play video from URL/YouTube/Twitch`,
                         `\`${config.prefix}ytplay\` - Play video from YouTube`,
                         `\`${config.prefix}stop\` - Stop playback`,
+                        `\`${config.prefix}scrub <time>\` - Jump to time (HH:MM:SS, HH:MM, or SS)`,
+                        `\`${config.prefix}position\` - Show current playback position`,
+                        `\`${config.prefix}quality <low/medium/high>\` - Set streaming quality`,
                         '',
                         '🛠️ **Utils**',
                         `\`${config.prefix}list\` - Show local videos`,
@@ -428,12 +511,22 @@ streamer.client.on('messageCreate', async (message) => {
     }
 });
 
+// Global variables to track current video state
+let currentVideoSource: string | null = null;
+let currentVideoTitle: string | null = null;
+let currentSeekTime: number = 0;
+
 // Function to play video
-async function playVideo(message: Message, videoSource: string, title?: string) {
-    logger.info(`Attempting to play: ${title || videoSource}`);
+async function playVideo(message: Message, videoSource: string, title?: string, seekTime: number = 0) {
+    logger.info(`Attempting to play: ${title || videoSource}${seekTime > 0 ? ` at ${formatTimeString(seekTime)}` : ''}`);
     const [guildId, channelId, cmdChannelId] = [config.guildId, config.videoChannelId, config.cmdChannelId!];
 
     streamStatus.manualStop = false;
+    
+    // Store current video info for scrubbing
+    currentVideoSource = videoSource;
+    currentVideoTitle = title || null;
+    currentSeekTime = seekTime;
 
     let inputForFfmpeg: any = videoSource;
     let tempFilePath: string | null = null;
@@ -502,7 +595,28 @@ async function playVideo(message: Message, videoSource: string, title?: string) 
         controller?.abort();
         controller = new AbortController();
 
-        const { command, output: ffmpegOutput } = prepareStream(inputForFfmpeg, streamOpts, controller.signal);
+        // Get optimized stream options for this specific video
+        const optimizedStreamOpts = getStreamOptionsForVideo(videoSource);
+        logger.info(`Using optimized stream options for ${videoSource}:`, {
+            frameRate: optimizedStreamOpts.frameRate,
+            bitrateVideo: optimizedStreamOpts.bitrateVideo,
+            minimizeLatency: optimizedStreamOpts.minimizeLatency
+        });
+
+        // Add seeking support to ffmpeg input
+        let ffmpegInput = inputForFfmpeg;
+        if (seekTime > 0) {
+            // For local files and downloaded videos, we can seek directly
+            if (typeof inputForFfmpeg === 'string' && (inputForFfmpeg.endsWith('.mp4') || inputForFfmpeg.endsWith('.mkv') || inputForFfmpeg.endsWith('.avi') || inputForFfmpeg.endsWith('.mov'))) {
+                ffmpegInput = `${inputForFfmpeg} -ss ${seekTime}`;
+            } else {
+                // For URLs and other sources, we need to handle seeking differently
+                // This is a simplified approach - you might need more sophisticated handling
+                logger.info(`Seeking not fully supported for this video source type. Starting from beginning.`);
+            }
+        }
+
+        const { command, output: ffmpegOutput } = prepareStream(ffmpegInput, optimizedStreamOpts, controller.signal);
 
         command.on("error", (err, stdout, stderr) => {
             logger.error("An error happened with ffmpeg:", err.message);
