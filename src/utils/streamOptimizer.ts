@@ -16,9 +16,9 @@ export function getOptimizedStreamOptions() {
         hardwareAcceleratedDecoding: config.hardwareAcceleratedDecoding,
         minimizeLatency: true, // Enable latency minimization
         h26xPreset: 'ultrafast' as const, // Use ultrafast preset for maximum performance
-        audioBitrate: 96, // Reduced audio bitrate
-        audioChannels: 2, // Stereo audio
-        audioSampleRate: 48000, // Standard sample rate
+        audioBitrate: 64, // Very low audio bitrate for performance
+        audioChannels: 1, // Mono audio to reduce processing
+        audioSampleRate: 44100, // Lower sample rate for performance
         keyframeInterval: 1, // Very frequent keyframes for better seeking
         bufferSize: 8192, // Much larger buffer for smoother playback
         maxMuxingQueueSize: 2048, // Increased muxing queue size
@@ -70,21 +70,23 @@ export function getOptimizedFfmpegOutput(): string {
         '-maxrate 1200k', // Maximum bitrate
         '-bufsize 2400k', // Buffer size
         
-        // Audio settings - reduced quality for performance
+        // Audio settings - ultra-aggressive optimization for performance
         '-c:a aac', // Use AAC codec
-        '-b:a 96k', // Reduced audio bitrate
-        '-ar 48000', // Sample rate
-        '-ac 2', // Stereo channels
+        '-b:a 64k', // Very low audio bitrate for performance
+        '-ar 44100', // Lower sample rate for performance
+        '-ac 1', // Mono audio to reduce processing
+        '-aac_coder twoloop', // Fast AAC encoding
+        '-aac_q 2', // Lower quality for speed
         
         // Output settings - optimized for low latency
         '-f mpegts', // MPEG-TS format
-        '-muxdelay 0.05', // Minimal muxing delay
-        '-muxpreload 0.05', // Minimal preload
+        '-muxdelay 0.01', // Minimal muxing delay
+        '-muxpreload 0.01', // Minimal preload
         '-flush_packets 1', // Flush packets immediately
         '-fflags +genpts', // Generate presentation timestamps
         '-avoid_negative_ts make_zero', // Handle negative timestamps
-        '-max_muxing_queue_size 2048', // Increased muxing queue
-        '-threads 2', // Limit threads to reduce CPU usage
+        '-max_muxing_queue_size 1024', // Reduced muxing queue
+        '-threads 1', // Single thread to reduce overhead
     ].join(' ');
 }
 
@@ -132,10 +134,34 @@ export function getPerformanceFilters(): string {
         'fps=fps=24', // Reduced frame rate
         'format=yuv420p', // Ensure compatible pixel format
         
-        // Audio filters - optimized for performance
-        'aresample=48000:async=1000', // Resample audio with async
-        'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo', // Audio format
+        // Audio filters - ultra-aggressive optimization for performance
+        'aresample=44100:async=1000', // Lower sample rate with async
+        'aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono', // Mono audio format
+        'volume=0.8', // Slight volume reduction to reduce processing
     ].join(',');
+}
+
+/**
+ * Get audio-optimized stream options for severe audio frame timing issues
+ */
+export function getAudioOptimizedStreamOptions() {
+    return {
+        width: 640, // Very low resolution
+        height: 360,
+        frameRate: 15, // Very low frame rate
+        bitrateVideo: 400, // Very low bitrate
+        bitrateVideoMax: 600,
+        videoCodec: Utils.normalizeVideoCodec(config.videoCodec),
+        hardwareAcceleratedDecoding: config.hardwareAcceleratedDecoding,
+        minimizeLatency: true,
+        h26xPreset: 'ultrafast' as const,
+        audioBitrate: 32, // Ultra-low audio bitrate
+        audioChannels: 1, // Mono audio
+        audioSampleRate: 22050, // Very low sample rate
+        keyframeInterval: 1,
+        bufferSize: 32768, // Very large buffer
+        maxMuxingQueueSize: 512, // Small muxing queue
+    };
 }
 
 /**
@@ -152,9 +178,9 @@ export function getEmergencyStreamOptions() {
         hardwareAcceleratedDecoding: config.hardwareAcceleratedDecoding,
         minimizeLatency: true,
         h26xPreset: 'ultrafast' as const,
-        audioBitrate: 64, // Very low audio bitrate
+        audioBitrate: 32, // Ultra-low audio bitrate
         audioChannels: 1, // Mono audio
-        audioSampleRate: 48000,
+        audioSampleRate: 22050, // Very low sample rate
         keyframeInterval: 1,
         bufferSize: 16384, // Very large buffer
         maxMuxingQueueSize: 4096,

@@ -11,7 +11,7 @@ import { downloadExecutable, downloadToTempFile, checkForUpdatesAndUpdate } from
 import { Youtube } from './utils/youtube.js';
 import { TwitchStream } from './@types/index.js';
 import { parseTimeString, formatTimeString } from './utils/timeParser.js';
-import { getOptimizedStreamOptions, getStreamOptionsForVideo, getEmergencyStreamOptions } from './utils/streamOptimizer.js';
+import { getOptimizedStreamOptions, getStreamOptionsForVideo, getEmergencyStreamOptions, getAudioOptimizedStreamOptions, getOptimizedFfmpegInput } from './utils/streamOptimizer.js';
 
 // Download yt-dlp and check for updates
 (async () => {
@@ -449,8 +449,8 @@ streamer.client.on('messageCreate', async (message) => {
                     }
 
                     const qualityArg = args.shift()?.toLowerCase();
-                    if (!qualityArg || !['low', 'medium', 'high', 'emergency'].includes(qualityArg)) {
-                        await sendError(message, 'Please specify quality: low, medium, high, or emergency');
+                    if (!qualityArg || !['low', 'medium', 'high', 'emergency', 'audio'].includes(qualityArg)) {
+                        await sendError(message, 'Please specify quality: low, medium, high, emergency, or audio');
                         return;
                     }
 
@@ -459,7 +459,8 @@ streamer.client.on('messageCreate', async (message) => {
                         low: { frameRate: 20, bitrateVideo: 800, minimizeLatency: true },
                         medium: { frameRate: 24, bitrateVideo: 1200, minimizeLatency: true },
                         high: { frameRate: 24, bitrateVideo: 1500, minimizeLatency: true },
-                        emergency: getEmergencyStreamOptions()
+                        emergency: getEmergencyStreamOptions(),
+                        audio: getAudioOptimizedStreamOptions()
                     };
 
                     const preset = qualityPresets[qualityArg as keyof typeof qualityPresets];
@@ -484,7 +485,7 @@ streamer.client.on('messageCreate', async (message) => {
                         `\`${config.prefix}stop\` - Stop playback`,
                         `\`${config.prefix}scrub <time>\` - Jump to time (HH:MM:SS, HH:MM, or SS)`,
                         `\`${config.prefix}position\` - Show current playback position`,
-                        `\`${config.prefix}quality <low/medium/high/emergency>\` - Set streaming quality`,
+                        `\`${config.prefix}quality <low/medium/high/emergency/audio>\` - Set streaming quality`,
                         '',
                         '🛠️ **Utils**',
                         `\`${config.prefix}list\` - Show local videos`,
@@ -606,15 +607,21 @@ async function playVideo(message: Message, videoSource: string, title?: string, 
 
         // Add seeking support to ffmpeg input
         let ffmpegInput = inputForFfmpeg;
+        
         if (seekTime > 0) {
             // For local files and downloaded videos, we can seek directly
             if (typeof inputForFfmpeg === 'string' && (inputForFfmpeg.endsWith('.mp4') || inputForFfmpeg.endsWith('.mkv') || inputForFfmpeg.endsWith('.avi') || inputForFfmpeg.endsWith('.mov'))) {
-                ffmpegInput = `${inputForFfmpeg} -ss ${seekTime}`;
+                // Use the optimized FFmpeg input function that handles seeking properly
+                ffmpegInput = getOptimizedFfmpegInput(inputForFfmpeg, seekTime);
+                logger.info(`Using optimized FFmpeg input with seeking: ${ffmpegInput}`);
             } else {
                 // For URLs and other sources, we need to handle seeking differently
                 // This is a simplified approach - you might need more sophisticated handling
                 logger.info(`Seeking not fully supported for this video source type. Starting from beginning.`);
             }
+        } else {
+            // Use optimized input without seeking
+            ffmpegInput = getOptimizedFfmpegInput(inputForFfmpeg, 0);
         }
 
         const { command, output: ffmpegOutput } = prepareStream(ffmpegInput, optimizedStreamOpts, controller.signal);
