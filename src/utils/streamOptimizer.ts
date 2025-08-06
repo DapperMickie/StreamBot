@@ -31,11 +31,6 @@ export function getOptimizedStreamOptions() {
 export function getOptimizedFfmpegInput(videoSource: string, seekTime: number = 0): string {
     let input = videoSource;
     
-    // Add seeking if needed
-    if (seekTime > 0) {
-        input = `${input} -ss ${seekTime}`;
-    }
-    
     // Add input options for better performance
     const inputOptions = [
         '-re', // Read input at native frame rate
@@ -47,6 +42,10 @@ export function getOptimizedFfmpegInput(videoSource: string, seekTime: number = 
         '-max_delay 100000', // Reduced maximum delay for audio/video sync
         '-thread_queue_size 512', // Increased thread queue size
     ];
+
+    if (seekTime > 0) {
+        inputOptions.push(`-ss ${seekTime}`);
+    }
     
     return `${inputOptions.join(' ')} -i "${input}"`;
 }
